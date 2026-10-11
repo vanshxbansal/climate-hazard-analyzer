@@ -2,7 +2,7 @@
 
 Full-stack app that analyses 30+ years of daily weather for any place and shows whether heatwaves are becoming more frequent, longer or more intense, with statistics that say when a trend is *not* distinguishable from noise.
 
-**Live app:** `<DEPLOYED_URL>` · **Demo video:** `<LOOM_URL>`
+**Live app:** https://climate-hazard-analyzer-hbxo.onrender.com (free tier: first load after idle can take ~50 s) · **Demo video:** `<LOOM_URL>`
 
 ## Features
 - **Region**: city/state search (Open-Meteo geocoding), click a point on a Leaflet map, or draw a lat-lon box (max 10°x10°).

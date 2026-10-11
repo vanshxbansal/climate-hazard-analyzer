@@ -8,4 +8,4 @@ services:
       - key: MONGODB_URI
         sync: false   # paste your MongoDB Atlas connection string in the Render dashboard
       - key: ALLOWED_ORIGINS
-        value: https://climate-hazard-analyzer.onrender.com
+        value: https://climate-hazard-analyzer-hbxo.onrender.com
