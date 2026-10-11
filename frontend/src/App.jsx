@@ -6,6 +6,41 @@ import MapPicker from './components/MapPicker'
 const clean = s => s.replace(/[^\w\s,.'()-]/gu, '').slice(0, 100)
 const r2 = n => Math.round(n * 100) / 100
 
+const EXAMPLES = [
+  { name: 'Delhi, India', lat: 28.61, lon: 77.21 },
+  { name: 'Phoenix, Arizona', lat: 33.45, lon: -112.07 },
+  { name: 'Dubai, UAE', lat: 25.2, lon: 55.27 },
+  { name: 'Sydney, Australia', lat: -33.87, lon: 151.21 },
+  { name: 'Madrid, Spain', lat: 40.42, lon: -3.7 },
+]
+
+function CountUp({ value, decimals = 0, suffix = '' }) {
+  const [v, setV] = useState(0)
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setV(value); return }
+    let raf, t0
+    const tick = t => {
+      t0 ??= t
+      const k = Math.min(1, (t - t0) / 900)
+      setV(value * (1 - Math.pow(1 - k, 3)))
+      if (k < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value])
+  return <>{v.toFixed(decimals)}{suffix}</>
+}
+
+function Skeleton() {
+  return (
+    <section className="results" aria-busy="true" aria-label="Loading results">
+      <div className="panel skel" style={{ height: 150 }} />
+      <div className="tiles">{[0, 1, 2, 3].map(i => <div key={i} className="tile skel" style={{ height: 84 }} />)}</div>
+      <div className="panel skel" style={{ height: 360 }} />
+    </section>
+  )
+}
+
 const TREND_ROWS = [
   ['hw_days', 'Heatwave days / yr'], ['events', 'Events / yr'], ['mean_duration', 'Mean duration (d)'],
   ['mean_intensity', 'Mean intensity (°C)'], ['max_duration', 'Longest event (d)'],
@@ -25,6 +60,7 @@ export default function App() {
   const [metric, setMetric] = useState('hw_days')
   const [state, setState] = useState({ status: 'idle' })
   const abort = useRef(null)
+  const resultsRef = useRef(null)
 
   useEffect(() => { getConfig().then(setCfg).catch(() => {}) }, [])
 
@@ -68,15 +104,25 @@ export default function App() {
     }
   }
 
+  const quick = c => {
+    setMode('city'); setPending(null); setHits([])
+    const r = { name: c.name, lat: c.lat, lon: c.lon }
+    setRegion(r); run(r)
+  }
+
+  useEffect(() => {
+    if (state.status === 'ok') resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [state.data])  // eslint-disable-line react-hooks/exhaustive-deps
+
   const switchMode = m => { setMode(m); setPending(null); setRegion(null); setHits([]) }
 
-  const run = useCallback(async () => {
-    if (!region || rangeError) return
+  const run = useCallback(async (r = region) => {
+    if (!r || rangeError) return
     abort.current?.abort()
     abort.current = new AbortController()
     setState({ status: 'loading' })
     try {
-      const data = await getAnalysis(region, { start, end, baselineStart: baseline[0], baselineEnd: baseline[1] }, abort.current.signal)
+      const data = await getAnalysis(r, { start, end, baselineStart: baseline[0], baselineEnd: baseline[1] }, abort.current.signal)
       setState({ status: 'ok', data })
     } catch (err) {
       if (err.name === 'AbortError') return
@@ -93,13 +139,24 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>Climate Hazard Trend Analyzer</h1>
-        <p className="sub">Historical heatwave frequency, duration and intensity for any place on Earth (ERA5 reanalysis via Open-Meteo).</p>
+      <header className="hero">
+        <span className="orb o1" /><span className="orb o2" /><span className="orb o3" />
+        <div className="hero-inner">
+          <span className="eyebrow">ERA5 reanalysis · 30+ years · any place on Earth</span>
+          <h1>Is it getting <em>hotter</em> where you live?</h1>
+          <p className="sub">Pick a place and see how heatwave frequency, duration and intensity have changed, with honest statistics that tell you when a trend is real and when it is just noise.</p>
+        </div>
+        <svg className="wave" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 50 C 150 10, 300 90, 450 45 S 750 5, 900 50 S 1100 85, 1200 40 L1200 80 L0 80Z" />
+        </svg>
       </header>
 
       <main>
         <section className="panel controls no-print" aria-label="Controls">
+          <div className="chips" aria-label="Quick examples">
+            <span className="muted">Try:</span>
+            {EXAMPLES.map(c => <button key={c.name} className="chip" onClick={() => quick(c)} disabled={state.status === 'loading'}>{c.name.split(',')[0]}</button>)}
+          </div>
           <label className="field">Hazard
             <select value="heatwave" onChange={() => {}} aria-label="Hazard type">
               <option value="heatwave">Heatwave</option>
@@ -147,8 +204,8 @@ export default function App() {
           </fieldset>
 
           {rangeError && <p className="err">{rangeError}</p>}
-          <button className="primary" onClick={run} disabled={!region || !!rangeError || state.status === 'loading'}>
-            {state.status === 'loading' ? 'Analysing…' : 'Analyse heatwaves'}
+          <button className="primary" onClick={() => run()} disabled={!region || !!rangeError || state.status === 'loading'}>
+            {state.status === 'loading' ? <><span className="spin" /> Analysing…</> : 'Analyse heatwaves'}
           </button>
           {state.status === 'loading' && <p className="hint">First request for a new location downloads ~30 years of daily data (a few seconds); repeats are served from the database.</p>}
           {state.status === 'error' && <p className="err" role="alert">{state.message}</p>}
@@ -158,8 +215,12 @@ export default function App() {
           <MapPicker mode={mode} point={region} box={region?.box} pending={pending} onPick={onMapPick} />
         </section>
 
+        {state.status === 'loading' && !d && <Skeleton />}
+        {!d && state.status !== 'loading' && (
+          <section className="empty no-print"><div className="panel hint-card"><strong>Start with a place</strong><p>Click an example city, search above, or tap the map. The first analysis of a new location downloads ~30 years of daily data (a few seconds); repeats come straight from the database.</p></div></section>
+        )}
         {d && (
-          <section className="results" aria-label="Results">
+          <section className="results" aria-label="Results" ref={resultsRef} key={`${d.region.name}|${d.params.start}|${d.params.end}|${d.params.baseline.start}`}>
             <div className="panel headline">
               <h2>{d.insights.headline}</h2>
               <ul className="notes">{d.insights.bullets.map((b, i) => <li key={i} className={b.level}>{b.text}</li>)}</ul>
@@ -173,8 +234,8 @@ export default function App() {
             <div className="tiles">
               <Tile label="Heatwave events" value={totalEvents} />
               <Tile label="Heatwave days" value={totalDays} />
-              <Tile label="Longest event" value={`${longest} d`} />
-              <Tile label="Valid data" value={`${(d.data_quality.valid_fraction * 100).toFixed(1)}%`} />
+              <Tile label="Longest event" value={longest} suffix=" d" />
+              <Tile label="Valid data" value={d.data_quality.valid_fraction * 100} decimals={1} suffix="%" />
             </div>
 
             <div className="panel">
@@ -246,6 +307,6 @@ export default function App() {
   )
 }
 
-function Tile({ label, value }) {
-  return <div className="tile"><div className="v">{value}</div><div className="l">{label}</div></div>
+function Tile({ label, value, decimals = 0, suffix = '' }) {
+  return <div className="tile"><div className="v"><CountUp value={value} decimals={decimals} suffix={suffix} /></div><div className="l">{label}</div></div>
 }

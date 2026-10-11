@@ -13,7 +13,7 @@ function theme() {
 
 function base(t, extra = {}) {
   return {
-    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+    responsive: true, maintainAspectRatio: false, animation: { duration: 900, easing: 'easeOutQuart' }, interaction: { mode: 'index', intersect: false },
     plugins: { legend: { labels: { color: t.text, usePointStyle: true, boxWidth: 8 } } },
     ...extra,
     scales: {
@@ -53,7 +53,7 @@ export function FrequencyChart({ yearly, metric }) {
     datasets: [
       {
         type: 'bar', label: def.label, data: vals, backgroundColor: yearly.map(y => (y.reliable ? t.heat : t.grid)),
-        borderRadius: 2, order: 3,
+        borderRadius: 4, borderSkipped: false, order: 3,
       },
       ...(def.roll ? [{
         type: 'line', label: '5-year rolling mean', data: yearly.map(y => y[def.roll]),
