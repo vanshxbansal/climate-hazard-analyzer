@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: climate-hazard-analyzer
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: MONGODB_URI
+        sync: false   # paste your MongoDB Atlas connection string in the Render dashboard
+      - key: ALLOWED_ORIGINS
+        value: https://climate-hazard-analyzer.onrender.com
